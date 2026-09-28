@@ -121,19 +121,56 @@ public sealed partial class RequirementsSelector : BoxContainer
     }
 
     // Omu start
-    public void SetupAlternateTitles(IReadOnlyList<string> titles, string? selected)
+    /// <param name="lockedTitles">Titles whose requirements are not met, with the reason. They can't be selected.</param>
+    public void SetupAlternateTitles(IReadOnlyList<string> titles,
+        string? selected,
+        IReadOnlyDictionary<string, FormattedMessage>? lockedTitles = null)
     {
         _alternateTitles = new List<string>(titles);
 
         TitleOptions.Clear();
         TitleOptions.AddItem(TitleLabel.Text ?? string.Empty, 0);
+
+        // The job description followed by the reason for every locked title.
+        var tooltipMessage = new FormattedMessage();
+        if (!string.IsNullOrEmpty(TitleLabel.ToolTip))
+            tooltipMessage.AddText(TitleLabel.ToolTip);
+
+        var anyLocked = false;
         for (var i = 0; i < _alternateTitles.Count; i++)
         {
-            TitleOptions.AddItem(Loc.GetString(_alternateTitles[i]), i + 1);
+            var name = Loc.GetString(_alternateTitles[i]);
+            if (lockedTitles == null || !lockedTitles.TryGetValue(_alternateTitles[i], out var reason))
+            {
+                TitleOptions.AddItem(name, i + 1);
+                continue;
+            }
+
+            TitleOptions.AddItem(Loc.GetString("job-alt-title-locked", ("title", name)), i + 1);
+            TitleOptions.SetItemDisabled(TitleOptions.GetIdx(i + 1), true);
+
+            if (!tooltipMessage.IsEmpty)
+            {
+                tooltipMessage.PushNewline();
+                tooltipMessage.PushNewline();
+            }
+
+            tooltipMessage.AddMarkupOrThrow(Loc.GetString("job-alt-title-locked-tooltip", ("title", FormattedMessage.EscapeText(name))));
+            tooltipMessage.PushNewline();
+            tooltipMessage.AddMessage(reason);
+            anyLocked = true;
         }
 
         TitleOptions.MinSize = TitleLabel.MinSize;
         TitleOptions.ToolTip = TitleLabel.ToolTip;
+        TitleOptions.TooltipSupplier = null;
+        if (anyLocked)
+        {
+            var tooltip = new Tooltip();
+            tooltip.SetMessage(tooltipMessage);
+            TitleOptions.TooltipSupplier = _ => tooltip;
+        }
+
         TitleLabel.Visible = false;
         TitleOptions.Visible = true;
         SelectAlternateTitle(selected);

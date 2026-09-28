@@ -3,11 +3,15 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using Content.Omu.Common.CCVar;
+using Content.Shared.CCVar;
 using Content.Shared.Dataset;
+using Content.Shared.Players.PlayTimeTracking;
 using Content.Shared.Preferences;
 using Content.Shared.Roles;
 using Robust.Shared.Configuration;
+using Robust.Shared.Player;
 using Robust.Shared.Prototypes;
+using Robust.Shared.Utility;
 
 // todo it'd be nice to omumod this and while i can think of ways to pass jobproto and whatnot as string that seems so fucking ass i ended up not doing it.
 namespace Content.Shared._Omu.Roles;
@@ -16,6 +20,7 @@ public sealed class JobAlternateTitleSystem : EntitySystem
 {
     [Dependency] private readonly IConfigurationManager _cfg = default!;
     [Dependency] private readonly IPrototypeManager _prototypes = default!;
+    [Dependency] private readonly ISharedPlaytimeManager _playtime = default!;
 
     public static ProtoId<LocalizedDatasetPrototype> DatasetId(ProtoId<JobPrototype> job) => "AlternateTitles" + job.Id;
 
@@ -33,5 +38,60 @@ public sealed class JobAlternateTitleSystem : EntitySystem
             return null;
 
         return TryGetTitles(job, out var titles) && titles.Contains(key) ? Loc.GetString(key) : null;
+    }
+
+    public HashSet<JobRequirement>? GetRequirements(ProtoId<JobPrototype> job, string title)
+    {
+        return _prototypes.TryIndex<JobAlternateTitleRequirementsPrototype>(job.Id, out var requirements)
+            ? requirements.Titles.GetValueOrDefault(title)
+            : null;
+    }
+
+    /// <summary>
+    /// Checks the requirements of an alternate title against the playtimes of a session.
+    /// Without a session there is nothing to check against, so the title is allowed.
+    /// </summary>
+    public bool IsTitleAllowed(ICommonSession? session,
+        HumanoidCharacterProfile? profile,
+        ProtoId<JobPrototype> job,
+        string title,
+        [NotNullWhen(false)] out FormattedMessage? reason)
+    {
+        reason = null;
+
+        // Only fetch playtimes when there is something to check, they throw on the server if not loaded yet.
+        if (session == null || !_cfg.GetCVar(CCVars.GameRoleTimers) || GetRequirements(job, title) == null)
+            return true;
+
+        return IsTitleAllowed(profile, job, title, _playtime.GetPlayTimes(session), out reason);
+    }
+
+    /// <summary>
+    /// Checks the requirements of an alternate title against the given playtimes.
+    /// Like job requirements they are skipped when role timers are disabled.
+    /// </summary>
+    public bool IsTitleAllowed(HumanoidCharacterProfile? profile,
+        ProtoId<JobPrototype> job,
+        string title,
+        IReadOnlyDictionary<string, TimeSpan> playTimes,
+        [NotNullWhen(false)] out FormattedMessage? reason)
+    {
+        reason = null;
+
+        if (!_cfg.GetCVar(CCVars.GameRoleTimers) || GetRequirements(job, title) is not { } requirements)
+            return true;
+
+        var reasons = new List<string>();
+        foreach (var requirement in requirements)
+        {
+            if (!requirement.Check(EntityManager, _prototypes, profile, playTimes, out var requirementReason))
+                reasons.Add(requirementReason.ToMarkup());
+        }
+
+        if (reasons.Count == 0)
+            return true;
+
+        reason = FormattedMessage.FromMarkupOrThrow(string.Join('\n', reasons));
+        return false;
     }
 }

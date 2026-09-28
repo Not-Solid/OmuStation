@@ -716,10 +716,12 @@ namespace Content.Shared.Preferences
             }
 
             // Omu start
+            var alternateTitleSystem = collection.Resolve<IEntityManager>().System<JobAlternateTitleSystem>();
             var alternateTitles = new Dictionary<ProtoId<JobPrototype>, string>();
             foreach (var (job, title) in _jobAlternateTitles)
             {
-                if (prototypeManager.TryIndex(JobAlternateTitleSystem.DatasetId(job), out var titles) && titles.Values.Contains(title))
+                if (prototypeManager.TryIndex(JobAlternateTitleSystem.DatasetId(job), out var titles) && titles.Values.Contains(title)
+                    && alternateTitleSystem.IsTitleAllowed(session, this, job, title, out _))
                     alternateTitles.Add(job, title);
             }
 

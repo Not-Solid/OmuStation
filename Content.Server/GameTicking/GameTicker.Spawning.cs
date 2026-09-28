@@ -290,6 +290,11 @@ namespace Content.Server.GameTicking
             }
             // End Omustation - Remake EE Traits System - block the player from spawning *serverside* if they have disallowed traits
 
+            // Omu - fall back to the default job title if the player does not meet the alternate title's requirements.
+            if (character.JobAlternateTitles.TryGetValue(jobId, out var alternateTitle)
+                && !_alternateTitles.IsTitleAllowed(player, character, jobId, alternateTitle, out _))
+                character = character.WithJobAlternateTitle(jobId, null);
+
             DoSpawn(player, character, station, jobId, silent, out var mob, out var jobPrototype, out var jobName);
 
             var announcedJobName = _alternateTitles.GetTitle(character, jobId) ?? jobName; // Omu

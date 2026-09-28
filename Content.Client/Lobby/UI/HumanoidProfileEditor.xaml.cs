@@ -1072,7 +1072,14 @@ namespace Content.Client.Lobby.UI
                         if (Profile != null && Profile.JobAlternateTitles.TryGetValue(job.ID, out var savedTitle))
                             selectedTitle = savedTitle;
 
-                        selector.SetupAlternateTitles(alternateTitles, selectedTitle);
+                        var lockedTitles = new Dictionary<string, FormattedMessage>();
+                        foreach (var title in alternateTitles)
+                        {
+                            if (!_alternateTitles.IsTitleAllowed(_playerManager.LocalSession, Profile, job.ID, title, out var titleReason))
+                                lockedTitles.Add(title, titleReason);
+                        }
+
+                        selector.SetupAlternateTitles(alternateTitles, selectedTitle, lockedTitles);
                         selector.OnAlternateTitleSelected += title =>
                         {
                             Profile = Profile?.WithJobAlternateTitle(job.ID, title);

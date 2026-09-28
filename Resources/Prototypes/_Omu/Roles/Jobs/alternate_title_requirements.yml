@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+# Locks alternate job titles behind requirements, just like jobs.
+# The id is the job the titles belong to, the keys are the title LocIds from alternate_titles.yml.
+# Any job requirement works here (RoleTimeRequirement, DepartmentTimeRequirement, OverallPlaytimeRequirement, ...).
+# Titles that are not listed have no requirements.
+#
+# Example:
+#
+# - type: jobAlternateTitleRequirements
+#   id: Quartermaster
+#   titles:
+#     job-name-alt-qm-2: # Deck Chief
+#     - !type:RoleTimeRequirement
+#       role: JobQuartermaster
+#       time: 36000 # 10 hrs
